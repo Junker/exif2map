@@ -1,0 +1,60 @@
+#!/usr/bin/env gosh
+
+(use scheme.show)
+(use util.match)
+(use srfi-1)
+(use srfi-13)
+(use gauche.process)
+(use gauche.parseopt)
+
+(define *services* '(("google" . "https://www.google.com/maps/search/?q=~F,~F")
+                     ("bing" . "https://www.bing.com/maps?cp=~F~~~F")
+                     ("openstreetmap" . "https://www.openstreetmap.org/?mlat=~F&mlon=~F")
+                     ("yandex" . "https://yandex.ru/maps/?ll=~F%2C~F")
+                     ("waze" . "https://www.waze.com/en/live-map/directions?latlng=~F%2C~F")) )
+
+(define (coord-str->number str)
+  (match (map string->number (string-split str " "))
+    ((degrees minutes seconds)
+     (+ degrees (/ minutes 60) (/ seconds 3600)))
+    (else (error "Coords have wrong format:~A" str))))
+
+(define (map-url service lat long)
+  (if-let1 pattern (alist-ref *services* service)
+    (format #f pattern lat long)
+    (error (format #f "Service ~S is unknown" service))))
+
+(define (show-help)
+  (show #t
+        "Usage: exif2map [options] file" nl
+        "--help,-h    Display help" nl
+        "--browser,-b Open in browser" nl
+        "--service,-s Map service (google,bing,openstreetmap,yandex,waze)"))
+
+(define (main args)
+  (let-args (cdr args)
+    ((help    "h|help")
+     (browser "b|browser")
+     (service "s|service=s" "google"))
+    (cond
+     (help (show-help))
+     (else
+      (let* ((file (last args))
+             (cmd (string-append "exiv2 -P v -K 'Exif.GPSInfo.GPSLatitude' "
+                                 "-K 'Exif.GPSInfo.GPSLatitudeRef' "
+                                 "-K 'Exif.GPSInfo.GPSLongitude' "
+                                 "-K 'Exif.GPSInfo.GPSLongitudeRef' "
+                                 file))
+             (lines (process-output->string-list cmd)))
+        (match lines
+          ((lat-str lat-ref long-ref long-str)
+           (let1 url (map-url service
+                              (* (coord-str->number lat-str)
+                                 (if (string=? lat-ref "S") -1 1))
+                              (* (coord-str->number long-str)
+                                 (if (string=? long-ref "W") -1 1)))
+                 (display url)
+                 (when browser
+                   (sys-fork-and-exec "xdg-open" (list "" url)))))
+          (else (error "No GPS EXIF")))))))
+  0)
