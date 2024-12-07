@@ -35,11 +35,13 @@
   (let-args (cdr args)
     ((help    "h|help")
      (browser "b|browser")
-     (service "s|service=s" "google"))
+     (service "s|service=s" "google")
+     . restargs)
     (cond
      (help (show-help))
+     ((null? restargs) (show-help))
      (else
-      (let* ((file (last args))
+      (let* ((file (car restargs))
              (cmd (string-append "exiv2 -P v -K 'Exif.GPSInfo.GPSLatitude' "
                                  "-K 'Exif.GPSInfo.GPSLatitudeRef' "
                                  "-K 'Exif.GPSInfo.GPSLongitude' "
