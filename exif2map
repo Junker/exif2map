@@ -37,26 +37,24 @@
      (browser "b|browser")
      (service "s|service=s" "google")
      . restargs)
-    (cond
-     (help (show-help))
-     ((null? restargs) (show-help))
-     (else
-      (let* ((file (car restargs))
-             (cmd (string-append "exiv2 -P v -K 'Exif.GPSInfo.GPSLatitude' "
-                                 "-K 'Exif.GPSInfo.GPSLatitudeRef' "
-                                 "-K 'Exif.GPSInfo.GPSLongitude' "
-                                 "-K 'Exif.GPSInfo.GPSLongitudeRef' "
-                                 file))
-             (lines (process-output->string-list cmd)))
-        (match lines
-          ((lat-str lat-ref long-ref long-str)
-           (let1 url (map-url service
-                              (* (coord-str->number lat-str)
-                                 (if (string=? lat-ref "S") -1 1))
-                              (* (coord-str->number long-str)
-                                 (if (string=? long-ref "W") -1 1)))
-                 (display url)
-                 (when browser
-                   (sys-fork-and-exec "xdg-open" (list "" url)))))
-          (else (error "No GPS EXIF")))))))
+    (if (or help (null? restargs))
+        (show-help)
+        (let* ((file (car restargs))
+               (cmd (string-append "exiv2 -P v -K 'Exif.GPSInfo.GPSLatitude' "
+                                   "-K 'Exif.GPSInfo.GPSLatitudeRef' "
+                                   "-K 'Exif.GPSInfo.GPSLongitude' "
+                                   "-K 'Exif.GPSInfo.GPSLongitudeRef' "
+                                   file))
+               (lines (process-output->string-list cmd)))
+          (match lines
+            ((lat-str lat-ref long-ref long-str)
+             (let1 url (map-url service
+                                (* (coord-str->number lat-str)
+                                   (if (string=? lat-ref "S") -1 1))
+                                (* (coord-str->number long-str)
+                                   (if (string=? long-ref "W") -1 1)))
+                   (display url)
+                   (when browser
+                     (sys-fork-and-exec "xdg-open" (list "" url)))))
+            (else (error "No GPS EXIF"))))))
   0)
